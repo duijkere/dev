@@ -1,31 +1,31 @@
 #!/bin/bash
 
-# get decoy IP - try multiple methods
-DECOY_IP=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}')
+# guard - only run at deployment, not during build
+# build VM uses 10.254.x.x range assigned by FDC during customization
+CURRENT_IP=$(ip addr show | grep 'inet ' | grep -v '127\.' | awk '{print $2}' | cut -d'/' -f1 | head -1)
 
-# fallback - get first non-loopback interface IP
-if [ -z "$DECOY_IP" ]; then
-    DECOY_IP=$(ip addr show | grep 'inet ' | grep -v '127\.' | awk '{print $2}' | cut -d'/' -f1 | head -1)
+if [[ $CURRENT_IP == 10.254.* ]]; then
+    logger -t open5gs-configure "build phase detected ($CURRENT_IP), skipping configuration"
+    exit 0
 fi
 
-# log what we got
-logger -t open5gs-configure "detected decoy IP: $DECOY_IP"
+# get decoy deployment IP
+DECOY_IP=$CURRENT_IP
 
 if [ -z "$DECOY_IP" ]; then
-    logger -t open5gs-configure "ERROR: could not detect IP, aborting"
+    logger -t open5gs-configure "ERROR: could not detect IP"
     exit 1
 fi
 
-# patch UPF
-sed -i "s/address: 127.0.0.7/address: $DECOY_IP/g" /etc/open5gs/upf.yaml
+logger -t open5gs-configure "deployment phase detected, configuring with IP: $DECOY_IP"
 
-# patch SMF
-sed -i "s/address: 127.0.0.4/address: $DECOY_IP/g" /etc/open5gs/smf.yaml
+# patch only active (uncommented) address lines
+sudo sed -i "/^[^#]/s/address: 127.0.0.7/address: $DECOY_IP/" /etc/open5gs/upf.yaml
+sudo sed -i "/^[^#]/s/address: 127.0.0.4/address: $DECOY_IP/" /etc/open5gs/smf.yaml
 
-logger -t open5gs-configure "patched yamls with IP: $DECOY_IP"
+logger -t open5gs-configure "yamls patched, starting services"
 
-# start services
 systemctl start open5gs-upfd
 systemctl start open5gs-smfd
 
-logger -t open5gs-configure "services started"
+logger -t open5gs-configure "done"
