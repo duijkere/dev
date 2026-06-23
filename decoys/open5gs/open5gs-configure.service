@@ -1,0 +1,12 @@
+[Unit]
+Description=Open5GS Dynamic IP Configuration
+After=network.target
+Before=open5gs-upfd.service open5gs-smfd.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/open5gs/open5gs-configure.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
