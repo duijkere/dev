@@ -1,0 +1,13 @@
+[Unit]
+Description=GTP-C Decoy Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/gtp-simple/gtp_decoy.py
+Restart=always
+RestartSec=5
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
